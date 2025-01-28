@@ -1,132 +1,139 @@
 package com.assignment.demo;
+
 import com.assignment.demo.entity.Customer;
 import com.assignment.demo.entity.CustomerTransaction;
 import com.assignment.demo.entity.RewardPoint;
+import com.assignment.demo.exception.ResourceNotFoundException;
+import com.assignment.demo.repository.CustomerRepository;
 import com.assignment.demo.repository.CustomerTransactionRepository;
 import com.assignment.demo.repository.RewardPointRepository;
-import com.assignment.demo.service.reward.RewardService;
-import org.junit.jupiter.api.BeforeEach;
+import com.assignment.demo.service.reward.RewardServiceImpl;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest
+@ExtendWith(MockitoExtension.class)
 public class RewardServiceTest {
+
+    @Mock
+    private CustomerTransactionRepository transactionRepository;
 
     @Mock
     private RewardPointRepository rewardPointRepository;
 
     @Mock
-    private CustomerTransactionRepository transactionRepository;
+    private CustomerRepository customerRepository;
+
     @InjectMocks
-    private RewardService rewardService;
-    private Customer customer;
+    private RewardServiceImpl rewardService;
 
-    @BeforeEach
-    public void setUp() {
-        MockitoAnnotations.openMocks(this); // Initialize the mocks
+    // Test case for calculateRewardPoints() when amount is above 100
+    @Test
+    void testCalculateRewardPoints_above100() {
+        BigDecimal amount = new BigDecimal("150.00");
+        int expectedPoints = 100; // (150 - 100) * 2 points = 100
+        int result = rewardService.calculateRewardPoints(amount);
+        assertEquals(expectedPoints, result);
+    }
 
-        customer = new Customer();
+    // Test case for calculateRewardPoints() when amount is between 50 and 100
+    @Test
+    void testCalculateRewardPoints_between50And100() {
+        BigDecimal amount = new BigDecimal("75.00");
+        int expectedPoints = 25; // (75 - 50) * 1 point = 25
+        int result = rewardService.calculateRewardPoints(amount);
+        assertEquals(expectedPoints, result);
+    }
+
+    // Test case for calculateRewardPoints() when amount is below 50
+    @Test
+    void testCalculateRewardPoints_below50() {
+        BigDecimal amount = new BigDecimal("40.00");
+        int expectedPoints = 0; // No points for amount below $50
+        int result = rewardService.calculateRewardPoints(amount);
+        assertEquals(expectedPoints, result);
+    }
+
+    // Test case for processTransaction() - successfully processes transaction
+    @Test
+    void testProcessTransaction() {
+        Customer customer = new Customer();
         customer.setCustomerId(1L);
-        customer.setName("John Doe");
-        customer.setEmail("john.doe@example.com");
-    }
 
-    // Test for calculating reward points based on the amount
-    @Test
-    public void testCalculateRewardPoints() {
-        // Test case where amount is 120
-        int points = rewardService.calculateRewardPoints(new BigDecimal(120));
-        assertEquals(90, points, "The reward points for $120 should be 90");
-
-        // Test case where amount is 50
-        points = rewardService.calculateRewardPoints(new BigDecimal(50));
-        assertEquals(0, points, "The reward points for $50 should be 0");
-
-        // Test case where amount is 200
-        points = rewardService.calculateRewardPoints(new BigDecimal(200));
-        assertEquals(200, points, "The reward points for $200 should be 200");
-    }
-
-    @Test
-    public void testProcessTransaction() {
-        // Create a mock transaction
         CustomerTransaction transaction = new CustomerTransaction();
         transaction.setCustomer(customer);
-        transaction.setAmount(new BigDecimal(150));
-        transaction.setDate(LocalDate.now().atStartOfDay());
-        transaction.setSpentDetails("Purchase at Store");
+        transaction.setAmount(new BigDecimal("150.00"));
+
         RewardPoint rewardPoint = new RewardPoint();
         rewardPoint.setCustomer(customer);
-        rewardPoint.setPoints(100);
-        rewardPoint.setMonth(LocalDate.now().getMonthValue());
-        rewardPoint.setYear(LocalDate.now().getYear());
-        when(rewardPointRepository.save(any(RewardPoint.class))).thenReturn(rewardPoint);
+        rewardPoint.setPoints(100); // (150 - 100) * 2 = 100 points
+        doNothing().when(transactionRepository).save(any(CustomerTransaction.class));
+        doNothing().when(rewardPointRepository).save(any(RewardPoint.class));
         rewardService.processTransaction(transaction);
-
-        // Verify if the repository save method was called
+        verify(transactionRepository, times(1)).save(transaction);
         verify(rewardPointRepository, times(1)).save(any(RewardPoint.class));
-
-        // Optionally, assert if the saved points are correct (assuming save returns the saved entity)
-        RewardPoint savedRewardPoint = rewardPointRepository.save(rewardPoint);
-        assertNotNull(savedRewardPoint);
-        assertEquals(100, savedRewardPoint.getPoints(), "The reward points for $150 should be 100");
     }
 
-    // Test to retrieve reward points for a customer
+    // Test case for getTotalRewardPointsForCustomer() - retrieves total points for customer
     @Test
-    public void testGetRewardPointsForCustomer() {
-        List<RewardPoint> mockRewardPoints = new ArrayList<>();
-        RewardPoint rewardPoint1 = new RewardPoint();
-        rewardPoint1.setPoints(90);
-        rewardPoint1.setCustomer(customer);
-        rewardPoint1.setMonth(LocalDate.now().getMonthValue());
-        rewardPoint1.setYear(LocalDate.now().getYear());
-
-        RewardPoint rewardPoint2 = new RewardPoint();
-        rewardPoint2.setPoints(50);
-        rewardPoint2.setCustomer(customer);
-        rewardPoint2.setMonth(LocalDate.now().getMonthValue());
-        rewardPoint2.setYear(LocalDate.now().getYear());
-
-        mockRewardPoints.add(rewardPoint1);
-        mockRewardPoints.add(rewardPoint2);
-//        when(rewardPointRepository.findByCustomerId(customer.getCustomerId())).thenReturn(mockRewardPoints);
-
-//        List<RewardPoint> retrievedRewardPoints = rewardService.getRewardPointsForCustomer(customer.getCustomerId());
-
-        // Verify the behavior and assert values
-//        assertNotNull(retrievedRewardPoints);
-//        assertEquals(2, retrievedRewardPoints.size(), "There should be 2 reward points records for the customer");
-//        assertEquals(90, retrievedRewardPoints.get(0).getPoints(), "First reward point should be 90");
-//        assertEquals(50, retrievedRewardPoints.get(1).getPoints(), "Second reward point should be 50");
+    void testGetTotalRewardPointsForCustomer() {
+        Long customerId = 1L;
+        BigDecimal totalPoints = new BigDecimal("250.00");
+        when(rewardPointRepository.findTotalRewardPointsByCustomerId(customerId)).thenReturn(totalPoints);
+        BigDecimal result = rewardService.getTotalRewardPointsForCustomer(customerId);
+        assertEquals(totalPoints, result);
     }
 
-    // Test to retrieve all reward points
+    // Test case for getTotalRewardPointsForCustomer() when no points are found
     @Test
-    public void testGetAllRewardPoints() {
-        List<RewardPoint> mockRewardPoints = new ArrayList<>();
-        mockRewardPoints.add(new RewardPoint());
-        mockRewardPoints.add(new RewardPoint());
-        when(rewardPointRepository.findAll()).thenReturn(mockRewardPoints);
+    void testGetTotalRewardPointsForCustomer_noPoints() {
+        Long customerId = 1L;
+        when(rewardPointRepository.findTotalRewardPointsByCustomerId(customerId)).thenReturn(null);
+        BigDecimal result = rewardService.getTotalRewardPointsForCustomer(customerId);
+        assertEquals(BigDecimal.ZERO, result); // If no points, return zero
+    }
 
+    // Test case for getAllRewardPoints() - retrieves all reward points
+    @Test
+    void testGetAllRewardPoints() {
+        RewardPoint reward1 = new RewardPoint();
+        RewardPoint reward2 = new RewardPoint();
+        List<RewardPoint> rewardPoints = List.of(reward1, reward2);
+        when(rewardPointRepository.findAll()).thenReturn(rewardPoints);
+        List<RewardPoint> result = rewardService.getAllRewardPoints();
+        assertEquals(2, result.size());
+        verify(rewardPointRepository, times(1)).findAll();
+    }
 
-        List<RewardPoint> allRewardPoints = rewardService.getAllRewardPoints();
+    // Test case for deleteCustomerWithTransactionsAndRewards() - successfully deletes customer
+    @Test
+    void testDeleteCustomerWithTransactionsAndRewards_success() {
+        Long customerId = 1L;
+        Customer customer = new Customer();
+        customer.setCustomerId(customerId);
+        when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+        doNothing().when(customerRepository).delete(any(Customer.class));
+        rewardService.deleteCustomerWithTransactionsAndRewards(customerId);
+        verify(customerRepository, times(1)).delete(customer);
+    }
 
-        // Verify behavior and assert values
-        assertNotNull(allRewardPoints);
-        assertEquals(2, allRewardPoints.size(), "There should be 2 reward points records in total");
+    // Test case for deleteCustomerWithTransactionsAndRewards() when customer not found
+    @Test
+    void testDeleteCustomerWithTransactionsAndRewards_customerNotFound() {
+        Long customerId = 1L;
+        when(customerRepository.findById(customerId)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () ->
+                rewardService.deleteCustomerWithTransactionsAndRewards(customerId));
     }
 }
 

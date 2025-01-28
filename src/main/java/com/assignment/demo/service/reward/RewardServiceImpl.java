@@ -48,23 +48,15 @@ public class RewardServiceImpl implements RewardService {
     @Override
     @Transactional
     public void processTransaction(CustomerTransaction transaction) {
-        // Calculate reward points for the transaction
         int points = calculateRewardPoints(transaction.getAmount());
 
-        // Create a new RewardPoint object and set the details
         RewardPoint rewardPoint = new RewardPoint();
         rewardPoint.setCustomer(transaction.getCustomer());
         rewardPoint.setPoints(points);
         rewardPoint.setMonth(LocalDate.now().getMonthValue());
         rewardPoint.setYear(LocalDate.now().getYear());
-
-        // Set the transaction in the reward point object
         rewardPoint.setCustomerTransaction(transaction);
-
-        // Save the reward point details in the database
         rewardPointRepository.save(rewardPoint);
-
-        // Save the customer transaction details in the database
         transactionRepository.save(transaction);
     }
 
