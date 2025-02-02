@@ -8,8 +8,7 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 
 @Service
-public class LoginServiceImpl implements LoginService {
-
+public class LoginAndLogoutServiceImpl implements LoginAndLogoutService {
 
     @Autowired
     private CustomerRepository customerRepository;

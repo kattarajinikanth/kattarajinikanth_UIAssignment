@@ -1,20 +1,18 @@
 package com.assignment.demo.service.reward;
 
-import com.assignment.demo.entity.Customer;
 import com.assignment.demo.entity.CustomerTransaction;
 import com.assignment.demo.entity.RewardPoint;
-import com.assignment.demo.exception.ResourceNotFoundException;
 import com.assignment.demo.repository.CustomerRepository;
 import com.assignment.demo.repository.CustomerTransactionRepository;
 import com.assignment.demo.repository.RewardPointRepository;
+import com.assignment.demo.service.transaction.TransactionService;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class RewardServiceImpl implements RewardService {
@@ -28,60 +26,75 @@ public class RewardServiceImpl implements RewardService {
     @Autowired
     private CustomerRepository customerRepository;
 
-    @Override
-    public int calculateRewardPoints(BigDecimal amount) {
-        int points = 0;
-
-        // Points for amount greater than $100
-        if (amount.compareTo(new BigDecimal(100)) > 0) {
-            points += amount.subtract(new BigDecimal(100)).intValue() * 2; // 2 points per dollar above $100
-        }
-
-        // Points for amount between $50 and $100
-        if (amount.compareTo(new BigDecimal(50)) > 0) {
-            points += Math.min(amount.intValue(), 100) - 50; // 1 point per dollar between $50 and $100
-        }
-
-        return points;
-    }
+    @Autowired
+    private TransactionService transactionService;
 
     @Override
     @Transactional
-    public void processTransaction(CustomerTransaction transaction) {
-        int points = calculateRewardPoints(transaction.getAmount());
+    public Map<Long, List<Map<String, Integer>>> calculateRewardPointsForCustomer(Long customerId, LocalDate endDate) {
+        String[] monthNames = {"", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+        LocalDate startDate = endDate.minusMonths(3);
+        List<CustomerTransaction> transactions = transactionRepository.findTransactionsForCustomerBetweenDates(customerId, startDate, endDate);
+        Map<Long, List<Map<String, Integer>>> customerRewardPoints = new HashMap<>();
+        Map<Integer, Integer> monthlyPointsMap = new HashMap<>();
 
-        RewardPoint rewardPoint = new RewardPoint();
-        rewardPoint.setCustomer(transaction.getCustomer());
-        rewardPoint.setPoints(points);
-        rewardPoint.setMonth(LocalDate.now().getMonthValue());
-        rewardPoint.setYear(LocalDate.now().getYear());
-        rewardPoint.setCustomerTransaction(transaction);
-        rewardPointRepository.save(rewardPoint);
-        transactionRepository.save(transaction);
-    }
+        // Iterate through each transaction to calculate points
+        for (CustomerTransaction transaction : transactions) {
+            int points = transactionService.calculateRewardPoints(transaction.getAmount());
+            int month = transaction.getDate().getMonthValue();
 
-
-    @Override
-    public BigDecimal getTotalRewardPointsForCustomer(Long customerId) {
-        BigDecimal totalPoints = rewardPointRepository.findTotalRewardPointsByCustomerId(customerId);
-        if (totalPoints == null) {
-            return BigDecimal.ZERO;  // If no reward points, return 0
+            monthlyPointsMap.put(month, monthlyPointsMap.getOrDefault(month, 0) + points);
         }
-        return totalPoints;
-    }
 
-    @Override
-    public List<RewardPoint> getAllRewardPoints() {
-        return rewardPointRepository.findAll();
-    }
+        int totalPoints = monthlyPointsMap.values().stream().mapToInt(Integer::intValue).sum();
+        List<Map<String, Integer>> monthlyRewardPointsList = new ArrayList<>();
 
-    @Override
-    public void deleteCustomerWithTransactionsAndRewards(Long customerId) {
-        Optional<Customer> customer = customerRepository.findById(customerId);
-        if (!customer.isPresent()) {
-            throw new ResourceNotFoundException("Customer not found with ID " + customerId);
+        int startMonth = startDate.getMonthValue();
+        int endMonth = endDate.getMonthValue();
+
+        // If the period spans across a year (i.e., endMonth < startMonth), handle the month rollover
+        for (int month = startMonth; month <= endMonth; month++) {
+            int currentMonth = month % 12;  // Handle month rollover
+            if (currentMonth == 0) {
+                currentMonth = 12;  // To handle December correctly
+            }
+
+            Map<String, Integer> monthlyMap = new HashMap<>();
+            String monthName = monthNames[currentMonth];  // Get the month name (e.g., "January")
+            monthlyMap.put(monthName, monthlyPointsMap.getOrDefault(currentMonth, 0));
+            monthlyRewardPointsList.add(monthlyMap);
         }
-        customerRepository.delete(customer.get());
+
+        // Add the total rewards map to the list
+        Map<String, Integer> totalRewardsMap = new HashMap<>();
+        totalRewardsMap.put("Total", totalPoints);
+        monthlyRewardPointsList.add(totalRewardsMap);
+
+        // Add the data to the final result map for the given customerId
+        customerRewardPoints.put(customerId, monthlyRewardPointsList);
+
+        return customerRewardPoints;
+    }
+
+
+    @Override
+    public Map<Long, List<RewardPoint>> getRewardsForCustomer(Long customerId) {
+        Map<Long, List<RewardPoint>> customerRewardsMap = new HashMap<>();
+        List<RewardPoint> rewards = rewardPointRepository.findRewardsByCustomerId(customerId);
+        if (rewards != null && !rewards.isEmpty()) {
+            customerRewardsMap.put(customerId, rewards);
+        } else {
+            customerRewardsMap.put(customerId, Collections.emptyList());
+        }
+        return customerRewardsMap;
+    }
+
+
+    @Override
+    public Map<Long, List<RewardPoint>> getAllRewardPointsGroupedByCustomer() {
+        List<RewardPoint> allRewards = rewardPointRepository.findAll();
+        return allRewards.stream()
+                .collect(Collectors.groupingBy(rewardPoint -> rewardPoint.getCustomer().getCustomerId()));
     }
 
 }

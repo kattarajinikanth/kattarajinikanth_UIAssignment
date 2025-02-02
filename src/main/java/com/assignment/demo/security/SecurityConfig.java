@@ -15,7 +15,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 import org.zalando.problem.spring.web.advice.security.SecurityProblemSupport;
 
-
 import java.util.List;
 
 @Configuration
@@ -45,10 +44,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/customers/register").permitAll()
                 .requestMatchers("/api/customers/login").permitAll()
                 .requestMatchers("/api/customers/logout").permitAll()
-                .requestMatchers("/api/customers/transactions").permitAll()
-                .requestMatchers("/api/customers/{customerId}/total-rewards").permitAll()
-                .requestMatchers("/api/customers/rewards").permitAll()
                 .requestMatchers("/api/customers/{customerId}").permitAll()
+                .requestMatchers("/api/transactions").permitAll()
+                .requestMatchers("/api/customer-rewards/{customerId}/{endDate}").permitAll()
+                .requestMatchers("/api/rewards/{customerId}").permitAll()
+                .requestMatchers("/api/total-rewards").permitAll()
                 .anyRequest().authenticated());
 
         return http.build();

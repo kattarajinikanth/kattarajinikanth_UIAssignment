@@ -7,4 +7,6 @@ import org.springframework.stereotype.Service;
 public interface CustomerService {
 
     void registerCustomer(Customer customer);
+
+    void deleteCustomerWithTransactionsAndRewards(Long customerId);
 }

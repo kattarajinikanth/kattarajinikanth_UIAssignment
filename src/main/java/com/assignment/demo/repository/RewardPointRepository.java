@@ -12,6 +12,6 @@ import java.util.List;
 @Repository
 public interface RewardPointRepository extends JpaRepository<RewardPoint, Long> {
 
-    @Query("SELECT SUM(r.points) FROM RewardPoint r WHERE r.customer.id = :customerId")
-    BigDecimal findTotalRewardPointsByCustomerId(@Param("customerId") Long customerId);
+    @Query("SELECT r FROM RewardPoint r WHERE r.customer.id = :customerId")
+    List<RewardPoint> findRewardsByCustomerId(@Param("customerId") Long customerId);
 }
